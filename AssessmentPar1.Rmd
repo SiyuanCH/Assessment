@@ -97,3 +97,28 @@ plot(pressure)
 ```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+ 1.introduction
+This report is to presenting the distribution of the number of cars per household in London Boroughs. To continue the research, it borrows the data from London Datastorage as the main resource and also based on the source of boundary data of London Boroughs from Consumer Data Research Centre (CDRC). There are two graphs display in this report which presents the same contents but produced by ArcGIS and R studio two different types of software. The following statement will make analysis make comparation between two software. 
+ 
+2. map description and analysis
+As the maps shows there is unequal distribution on the number of cars owned per household in the range of 33 London Boroughs. Urban peripheral areas possess more cars on average than centre areas, especially on east and west-north districts where one household owned more than one car.
+ 
+In general, people who lived in the periphery might stuffer longer commuting-distance and time than others. Due to the long distance, bicycle and walk cannot satisfied their commuting demand.  Moreover, large and low-density peripheral areas are hard to develop public transportation. Therefore, vehicles have become the major option for travelling. However, city centre residents are served by well-structured public transportation, such as bus, underground, taxi and city bicycle service. They have such large number of travelling options, so private car only takes less than one car per two households.  
+ 
+3. workflows
+3.1 ArcCatalog and ArcMap 
+To setting up the GIS workplace, ArcCatalog has been used at first to manage the geodatabase. After that, all the works are taking place on ArcMap. In order to combine the "csv." source with "shp." file, it adopted "join" function to merge these two documents by index the same geocode. Another function named "Model Builder" also has introduced to this process, which is a visual programming language for building workflows. All data resources have been settled, the next step is adjusting the status of symbology in the layer properties dialog box.
+ 
+3.2 R studio 
+The first step of running R is to install and library several related packages to read the "csv." file from the website and be able to visualise the data resources.  Once loaded the data from internet, the useful part of sources should be summarised and selected from the file. When joined two files together, it just utlised code to index the same code from attribute table to accomplish. That will be all to merging and mapping the data from two different types of data resources. 
+                                                                                                       
+4. advantage and disadvantage
+ArcGIS has benefits on the functions of ArcTool and easy presenting. The most outstanding function is the Model Builder, which is an easy-to-use application for creating and running workflows. Nevertheless, ArcGIS has more complicated and similar repeated procedure, especially on data merging process. 
+ 
+On the other hand, R is easy to summarise the data from document, using the packages to reach the purpose. In terms of combining and indexing data, it also has clearly advantage than ArcGIS. However, R is not easy for the people who are new to visilisation, the presenting commond is complicated. And it needs to look up and install some packages to complete the data presenting. In the producing process, there are some packages turn up install failed because the update version is not suitable for all functions. Otherwise, it also shows up with lack of some elements when library the packages. 
+ 
+5. conclusion 
+On conclusion, both AcrGIS and R studio are suitable for the merging and mapping data. This report is limited on the analysis statement for unable to offer suasive supporting. 
+
