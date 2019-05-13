@@ -1,0 +1,224 @@
+---
+title: "AssessmentPar3"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+getwd()
+# install and library several packages
+install.packages("tidyverse")
+library(tidyverse)
+library(downloader)
+library(rgdal)
+library(sf)
+library(ggplot2)
+library(reshape2)
+library(plotly)
+#read shapefile.
+LondonWardsnew <- readOGR("N://GIS//wk9//NewLondonWard.shp", layer="NewLondonWard")
+#convert shapefle into table.
+LondonWardsnewSF <- st_as_sf(LondonWardsnew)
+# select variables and check the data details
+summary(LondonWardsnewSF$PopDensity)
+summary(LondonWardsnewSF$CarsPerHH2)
+summary(LondonWardsnewSF$IncomeSupp)
+summary(LondonWardsnewSF$AvgPubTran)
+
+#ploting data
+library(tmap)
+library(ggplot2)
+
+#plot hisogram
+qplot(PopDensity, data = LondonWardsnewSF, geom = "histogram")
+qplot(CarsPerHH2, data = LondonWardsnewSF, gemo = "histogram")
+qplot(IncomeSupp, data = LondonWardsnewSF, gemo = "histogram")
+qplot(AvgPubTran, data = LondonWardsnewSF, gemo = "histogram")
+
+tmap_mode("view")
+tm_shape(LondonWardsnew) +tm_polygons("CarsPerHH2",style="jenks",palette="Blues",midpoint=NA,title="Cars per household in London")
+
+#introduce the package of corrplot to caculate conllinearity.
+install.packages("corrplot")
+library(corrplot)
+#to check for correlations, create a correlation matrix and then visualise it using the corrplot package
+#first, convert into date.frame
+LondonWardsnewDF <- st_set_geometry(LondonWardsnewSF,NULL)
+
+# select variables from the table
+cormat <- cor(LondonWardsnewDF[,c(18,50,71,72)], use="complete.obs", method="pearson")
+corrplot(cormat)
+
+#explore is there to be a relationship?
+qplot(PopDensity, CarsPerHH2, data = LondonWardsnewSF, geom = "point") + stat_smooth(method="lm", se=FALSE, size=1)
+#It looks like there is a negative relationship, so can we discover exactly what this relationship is using a linear regression model (we actually fitted one above to create the blue line)
+library(broom)
+#to fit the linear regrssion model, use the lm() function
+model1 <- lm(PopDensity ~ CarsPerHH2 + IncomeSupp + AvgPubTran, data = LondonWardsnewSF)
+#write the results out into a dataframe
+model1_res <- tidy(model1)
+#examine the results
+summary(model1)
+#examine some of the diagnostic plots to see if there is any patterning in the residuals
+plot(model1)
+
+#save the residuals into your dataframe
+LondonWardsnewSF$model1_resids <- model1$residuals
+#now plot the residuals
+tmap_mode("view")
+qtm(LondonWardsnewSF, fill = "model1_resids")
+
+
+# Clustering analysis.
+
+library(spatstat)
+library(sp)
+library(rgeos)
+library(maptools)
+library(GISTools)
+library(tmap)
+library(sf)
+library(geojsonio)
+library(sp)
+library(rgdal)
+tubestations <- readOGR("https://www.doogal.co.uk/LondonStationsKML.ashx", "London stations with zone information")
+summary(tubestations)
+tubestations<-data.frame(tubestations)
+# remove the height column.
+tubestation<-tubestations[,3:4]
+summary(tubestation)
+#convert dataframe to spatialpointDataFrame using Proj4.
+stations <- SpatialPointsDataFrame(coords =tubestation, data = tubestation,proj4string = CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"))
+summary(stations)
+qtm(LondonWardsnew)
+summary(LondonWardsnew)
+BNG = "+init=epsg:27700"
+LondonWardsnewBNG <- spTransform(LondonWardsnew,BNG)
+
+
+tmap_mode("view")
+tm_shape(LondonWardsnewBNG) +
+  tm_polygons(col = NA, alpha = 0.5) +
+  tm_shape(stations) +
+  tm_dots(col ="red")
+
+#now set up an EPSG string to help set the projection 
+BNG = "+init=epsg:27700"
+WGS = "+init=epsg:4326"
+tubestationsBNG <- spTransform(stations, BNG)
+summary(tubestationsBNG)
+#remove any Plaques with the same grid reference as this will cause problems later on in the analysis...
+tubestationsBNG <- remove.duplicates(tubestationsBNG)
+stationsSub <- tubestationsBNG[LondonWardsnewBNG,]
+tm_shape(LondonWardsnewBNG) +
+  tm_polygons(col = NA, alpha = 0.5) +
+  tm_shape(stationsSub) +
+  tm_dots(col = "red")
+res <- poly.counts(stationsSub, LondonWardsnew)
+#and add this as a column in our spatialPolygonsDataframe
+LondonWardsnew@data$stationsCount<-res
+#as the wards are of different sizes, perhaps best that we calculate a density
+LondonWardsnew@data$stationsDensity <- LondonWardsnew$stationsCount/poly.areas(LondonWardsnew)
+#let's just check the data to see if the calculations have worked
+LondonWardsnew@data
+tm_shape(LondonWardsnew) +
+  tm_polygons("stationsDensity",
+              style="jenks",
+              palette="PuOr",
+              midpoint=NA,
+              title="London tubestation Density")
+library(spdep)
+#####
+#First calculate the centroids of all Wards in London
+coordsW <- coordinates(LondonWardsnew)
+plot(coordsW)
+#Now we need to generate a spatial weights matrix (remember from the lecture). We'll start with a simple binary matrix of queen's case neighbours
+#create a neighbours list
+LWard_nb <- poly2nb(LondonWardsnew, queen=T)
+#plot them
+plot(LWard_nb, coordinates(coordsW), col="red")
+#add a map underneath
+plot(LondonWardsnew, add=T)
+#create a spatial weights object from these weights
+Lward.lw <- nb2listw(LWard_nb, style="C")
+head(Lward.lw$neighbours)
+#moran's I test - this tells us whether we have clustered values (close to 1) or dispersed values (close to -1)
+#we will calculate for the densities rather than raw values
+I_LWard_Global_Density <- moran.test(LondonWardsnew@data$stationsDensity, Lward.lw)
+I_LWard_Global_Density
+#Geary's C as well..? This tells us whether similar values or dissimilar values are clusering
+C_LWard_Global_Density <- geary.test(LondonWardsnew@data$stationsDensity, Lward.lw)
+C_LWard_Global_Density
+##Getis Ord General G...? This tells us whether high or low values are clustering. If G > Expected = High values clustering; if G < expected = low values clustering
+G_LWard_Global_Density <- globalG.test(LondonWardsnew@data$stationsDensity, Lward.lw)
+G_LWard_Global_Density
+#use the localmoran function to generate I for each ward in the city
+I_LWard_Local <- localmoran(LondonWardsnew@data$stationsCount, Lward.lw)
+I_LWard_Local_Density <- localmoran(LondonWardsnew@data$stationsDensity, Lward.lw)
+#what does the output (the localMoran object) look like?
+head(I_LWard_Local_Density)
+tail(I_LWard_Local_Density)
+#There are 5 columns of data. We want to copy some of the columns (the I score (column 1) and the z-score standard deviation (column 4)) back into the LondonWards spatialPolygonsDataframe
+LondonWardsnew@data$BLocI <- I_LWard_Local[,1]
+LondonWardsnew@data$BLocIz <- I_LWard_Local[,4]
+LondonWardsnew@data$BLocIR <- I_LWard_Local_Density[,1]
+LondonWardsnew@data$BLocIRz <- I_LWard_Local_Density[,4]
+#set the breaks manually based on the rule that data points >2.58 or <-2.58 standard deviations away from the mean are significant at the 99% level (<1% chance that autocorrelation not present); >1.96 - <2.58 or <-1.96 to >-2.58 standard deviations are significant at the 95% level (<5% change that autocorrelation not present). >1.65 = 90% etc.
+breaks1<-c(-1000,-2.58,-1.96,-1.65,1.65,1.96,2.58,1000)
+#create a new diverging colour brewer palette and reverse the order using rev so higher values correspond to red
+MoranColours<- rev(brewer.pal(8, "RdGy"))
+
+#now plot on an interactive map
+tm_shape(LondonWardsnew) +
+  tm_polygons("BLocIRz",
+              style="fixed",
+              breaks=breaks1,
+              palette=MoranColours,
+              midpoint=NA,
+              title="Local Moran's I, tubestations distribution in London")
+Gi_LWard_Local_Density <- localG(LondonWardsnew@data$stationsDensity, Lward.lw)
+#Check the help file  (?localG) to see what a localG object looks like - it is a bit different from a localMoran object as it only contains just a single value - the z-score (standardised value relating to whether high values or low values are clustering together)
+head(Gi_LWard_Local_Density)
+LondonWardsnew@data$BLocGiRz <- Gi_LWard_Local_Density
+GIColours<- rev(brewer.pal(8, "RdBu"))
+
+#now plot on an interactive map
+tm_shape(LondonWardsnew) +
+  tm_polygons("BLocGiRz",
+              style="fixed",
+              breaks=breaks1,
+              palette=GIColours,
+              midpoint=NA,
+              title="Gi*, tubestations in London")
+
+
+```
+
+
+```
+
+
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
